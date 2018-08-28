@@ -12,22 +12,18 @@ import com.gmail.razandale.jpa.JPAExecutor;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.function.Function;
-import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.EntityTransaction;
 import javax.swing.JOptionPane;
 import static javax.swing.JOptionPane.ERROR_MESSAGE;
 
 public class ShiftManagerImpl implements ShiftManager {
 
     private Shift shift;
-    private EntityManagerFactory emf;
+    private JPAExecutor jpaExecutor;
     private final List<ShiftManagerListener> shiftManagerListeners;
 
-    public ShiftManagerImpl(EntityManagerFactory emf) {
+    public ShiftManagerImpl(JPAExecutor jpaExecutor) {
         shiftManagerListeners = new ArrayList<>();
-        this.emf = emf;
+        this.jpaExecutor = jpaExecutor;
         //Получаем количество незавершенных смен.
         List<Shift> shifts = getAllUnfinishedShifts();
         switch (shifts.size()) {
@@ -58,29 +54,6 @@ public class ShiftManagerImpl implements ShiftManager {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
-    private <T> T executeUpdateQuery(Function<EntityManager, T> function) {
-        EntityManager em = emf.createEntityManager();
-        try {
-            EntityTransaction trans = em.getTransaction();
-            try {
-                return function.apply(em);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                return null;
-            } finally {
-                if (trans.isActive()) {
-                    trans.rollback();
-                }
-                if (em != null) {
-                    em.close();
-                }
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
-
     /**
      * Уведомляет всех слушателей об изменении состоянии контролируемой
      * менеджером смены.
@@ -92,17 +65,15 @@ public class ShiftManagerImpl implements ShiftManager {
     }
 
     private List<Shift> getAllUnfinishedShifts() {
-        return JPAExecutor.executeQuery((em) -> {
+        return jpaExecutor.executeQuery((em) -> {
             return em.createNamedQuery("getAllUnfinishedShifts", Shift.class).getResultList();
-        },
-                emf);
+        });
     }
 
     private Shift getShiftById(Long id) {
-        return JPAExecutor.executeQuery((em) -> {
+        return jpaExecutor.executeQuery((em) -> {
             return em.find(Shift.class, id);
-        },
-                emf);
+        });
     }
 
     /**
@@ -148,7 +119,7 @@ public class ShiftManagerImpl implements ShiftManager {
 
     private Shift saveCurrentShift() {
         if (shift != null) {
-            return JPAExecutor.merge(shift, emf);
+            return jpaExecutor.merge(shift);
         } else {
             JOptionPane.showMessageDialog(
                     null,
